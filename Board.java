@@ -150,7 +150,12 @@ public class Board {
 
     public Board elementSwap(int row1, int col1, int row2, int col2) {
         int[][] returnMatrix = new int[width][width];
-        Board returnBoard = new Board(board);
+
+        for (int i = 0; i<width; i++) {
+            System.arraycopy(board[i], 0, returnMatrix[i], 0, width);
+        }
+
+        Board returnBoard = new Board(returnMatrix);
         returnBoard.board[row1][col1] = board[row2][col2];
         returnBoard.board[row2][col2] = board[row1][col1];
         return returnBoard;
