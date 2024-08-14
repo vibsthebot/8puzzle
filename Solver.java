@@ -1,93 +1,153 @@
+import edu.princeton.cs.algs4.MinPQ;
+import edu.princeton.cs.algs4.StdOut;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.PriorityQueue;
 
 public class Solver {
-    Board beginning;
+    private final Board beginning;
+    private final Iterable<Board> solution;
+    private final int width;
+    private boolean solvable = true;
     // find a solution to the initial board (using the A* algorithm)
     public Solver(Board initial) {
+        if (initial == null) throw new IllegalArgumentException("Board is null");
         beginning = initial;
+        width = beginning.dimension();
+        solution = aStarSolver();
     }
 
     // is the initial board solvable? (see below)
     public boolean isSolvable() {
-        int[] flattendPuzzle = new int[beginning.width*beginning.width-1];
-        int inversions = 0;
-        for (int i = 0; i < flattendPuzzle.length; i++) {
-            if (flattendPuzzle[i] != 0) {
-                for (int j = i + 1; j < flattendPuzzle.length; i++) {
-                    if (flattendPuzzle[i] > flattendPuzzle[j] && flattendPuzzle[j] != 0) {
-                        inversions++;
-                    }
-                }
-            }
-        }
-        return inversions % 2 == 0;
+        return solvable;
     }
 
     // min number of moves to solve initial board; -1 if unsolvable
     public int moves() {
         if (!isSolvable()) return -1;
-
+        int size = -1;
+        for (Board i : solution) {
+            size++;
+        }
+        return size;
     }
 
     // sequence of boards in a shortest solution; null if unsolvable
     public Iterable<Board> solution() {
+        return solution;
+    }
+
+    private Iterable<Board> aStarSolver() {
         if (!isSolvable()) return null;
-        PriorityQueue<Object[]> open_set = new PriorityQueue<>();
-        List<Object> closed_set = new ArrayList<>();
-        Node start = new Node(beginning, false, 0, beginning.manhattan());
-        open_set.add(new Object[]{start.f, start});
-        while (open_set) {
-            Object currentObject = open_set.poll()[1];
-            if (currentObject.getClass() != Node.class) {
-                throw new IllegalArgumentException("Illegals");
-            }
-            Node currentNode = (Node) currentObject;
-            closed_set.add(currentNode.state);
+
+        MinPQ<Node> openSet = new MinPQ<>();
+        List<List<Board>> closedSet = new ArrayList<>();
+        for (int i = 0; i < 10; i++)
+            closedSet.add(i, new ArrayList<>());
+        Node start = new Node(beginning, null, 0, beginning.manhattan());
+        openSet.insert(start);
+
+        MinPQ<Node> openSetTwin = new MinPQ<>();
+        List<List<Board>> closedSetTwin = new ArrayList<>();
+        for (int i = 0; i < 10; i++)
+            closedSetTwin.add(i, new ArrayList<>());
+        Board beginningTwin = beginning.twin();
+        Node startTwin = new Node(beginningTwin, null, 0, beginningTwin.manhattan());
+        openSetTwin.insert(startTwin);
+
+        while (true) {
+            Node currentNode = openSet.delMin();
+            closedSet.get(currentNode.g % 10).add(currentNode.state);
 
             if (currentNode.state.isGoal()) {
                 List<Board> path = new ArrayList<>();
-                while (true) {
+                while (currentNode.parent != null) {
                     path.add(currentNode.state);
-                    if (currentNode.parent == null) break;
+                    currentNode = currentNode.parent;
                 }
+                path.add(currentNode.state);
                 Collections.reverse(path);
+
                 return path;
             }
-            Iterable<Board> neighbors = currentNode.state.neighbors();
-            for (Board child_state : neighbors) {
-                if (!closed_set.contains(child_state)) {
 
+            Iterable<Board> neighbors = currentNode.state.neighbors();
+            for (Board childState : neighbors) {
+                if (currentNode.parent == null || currentNode.parent.state != childState) {
+                    if (!closedSet.get(childState.manhattan()%10).contains(childState)) {
+                        int g = currentNode.g + 1;
+                        int h = childState.manhattan();
+                        Node childNode = new Node(childState, currentNode, g, h);
+                        openSet.insert(childNode);
+                        //System.out.println(openSet.size());
+                        //System.out.println(closedSet.size());
+                    }
+                }
+            }
+
+            Node currentNodeTwin = openSetTwin.delMin();
+            closedSetTwin.get(currentNodeTwin.g%10).add(currentNodeTwin.state);
+
+            if (currentNodeTwin.state.isGoal()) {
+                solvable = false;
+                return null;
+            }
+
+            Iterable<Board> neighborsTwin = currentNodeTwin.state.neighbors();
+            for (Board childState : neighborsTwin) {
+                if (currentNodeTwin.parent == null || currentNodeTwin.parent.state != childState) {
+                    if (!closedSetTwin.get(childState.manhattan()%10).contains(childState)) {
+                        int g = currentNodeTwin.g + 1;
+                        int h = childState.manhattan();
+                        Node childNode = new Node(childState, currentNodeTwin, g, h);
+                        openSetTwin.insert(childNode);
+                    }
                 }
             }
         }
     }
 
-
-
     // test client (see below)
     public static void main(String[] args) {
-        Board tiles  = new Board(new int[][]{{1, 2, 3}, {4, 5, 6}, {8, 7, 0}});
-        Solver solver = new Solver(tiles);
-        System.out.println(solver.isSolvable());
+        int[][] tiles  = new int[][]{{7, 8, 5}, {4, 0, 2}, {3, 6, 1}};
+        Board initial = new Board(tiles);
+
+        // solve the puzzle
+        Solver solver = new Solver(initial);
+
+        // print solution to standard output
+        if (!solver.isSolvable())
+            StdOut.println("No solution possible");
+        else {
+            StdOut.println("Minimum number of moves = " + solver.moves());
+            for (Board board : solver.solution()) {
+                StdOut.println(board.toString());
+                //StdOut.println(board.getCalls());
+            }
+        }
     }
 
-}
+    private static class Node implements Comparable<Node> {
+        Board state;
+        Node parent;
+        int g;
+        int h;
+        int f;
 
-class Node {
-    Board state;
-    Object parent;
-    int g;
-    int h;
-    int f;
+        public Node(Board state, Node parent, int g, int h) {
+            this.state = state;
+            this.parent = parent;
+            this.g = g;
+            this.h = h;
+            f = g + h;
+        }
 
-    public Node(Board state, Object parent, int g, int h) {
-        this.state = state;
-        this.parent = parent;
-        this.g = g;
-        this.h = h;
-        f = g + h;
+        @Override
+        public int compareTo(Node other) {
+            return Integer.compare(f, other.f);
+        }
     }
 }
+
+
