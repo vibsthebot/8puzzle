@@ -1,1 +1,1 @@
-This is an 8puzzle Board datatype and Solver for any n-by-n boards.
+The 8-puzzle is a classic sliding puzzle consisting of a 3x3 grid with 8 numbered tiles and one empty space. The objective is to rearrange the tiles from a given initial configuration to a goal configuration using a series of legal moves. This algorithm implements the a* search algorithm to solve the 8puzzle.
